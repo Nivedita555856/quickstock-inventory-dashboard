@@ -1,0 +1,24 @@
+/* QuickStock custom styling on top of Bootstrap 5 */
+
+body {
+    background-color: #f4f6f9;
+}
+
+.quickstock-navbar {
+    background-color: #0d3b66;
+}
+
+.stat-card {
+    border-left: 4px solid #0d3b66;
+}
+
+.nav-link.active {
+    font-weight: 600;
+    border-bottom: 2px solid #ffffff;
+}
+
+.table thead th {
+    text-transform: uppercase;
+    font-size: 0.8rem;
+    letter-spacing: 0.03em;
+}
