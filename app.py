@@ -14,9 +14,14 @@ Run locally with:
 import os
 import sqlite3
 
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request, redirect, url_for, session, flash
 
 app = Flask(__name__)
+
+# A session secret key is required so Flask can store the shopping cart
+# in a signed cookie. Fine for this teaching demo; a real app would load
+# this from an environment variable instead of hardcoding it.
+app.secret_key = "quickstock-dev-secret-key"
 
 # ---------------------------------------------------------------------------
 # Database setup
@@ -53,8 +58,25 @@ def init_db():
     if row_count == 0:
         starter_products = [
             ("Dell Inspiron 15 Laptop", 55000.00, 20),
+            ("HP Pavilion 14 Laptop", 48000.00, 15),
+            ("Lenovo ThinkPad E14 Laptop", 62000.00, 10),
             ("Logitech M185 Wireless Mouse", 800.00, 50),
+            ("Dell Wired Optical Mouse", 450.00, 60),
             ("HP Wired Keyboard", 1200.00, 15),
+            ("Logitech K380 Wireless Keyboard", 2500.00, 25),
+            ("Dell 24-inch Full HD Monitor", 9500.00, 12),
+            ("Samsung 27-inch LED Monitor", 15500.00, 8),
+            ("Logitech C270 Webcam", 2200.00, 30),
+            ("boAt Rockerz Wireless Headphones", 1800.00, 40),
+            ("JBL Tune 500 Headphones", 2100.00, 22),
+            ("HP DeskJet Printer", 6500.00, 10),
+            ("Canon PIXMA Printer", 7200.00, 7),
+            ("TP-Link Wi-Fi Router", 1800.00, 35),
+            ("D-Link Wireless Router", 1600.00, 28),
+            ("SanDisk 32GB Pendrive", 450.00, 100),
+            ("Seagate 1TB External Hard Drive", 4200.00, 18),
+            ("Anker Power Bank 10000mAh", 1500.00, 45),
+            ("Logitech Z120 Speakers", 900.00, 33),
         ]
         conn.executemany(
             "INSERT INTO products (name, price, stock) VALUES (?, ?, ?)",
@@ -65,26 +87,72 @@ def init_db():
     conn.close()
 
 
+def get_cart_items():
+    """Look up full product details for everything currently in the cart.
+
+    The cart itself just lives in the session as {product_id: quantity} -
+    this turns that into a list the templates can render, plus a grand total.
+    """
+    cart = session.get("cart", {})
+    items = []
+    grand_total = 0.0
+
+    if cart:
+        conn = get_db_connection()
+        for product_id_str, quantity in cart.items():
+            product = conn.execute(
+                "SELECT * FROM products WHERE id = ?", (int(product_id_str),)
+            ).fetchone()
+            if product:
+                subtotal = product["price"] * quantity
+                grand_total += subtotal
+                items.append(
+                    {
+                        "id": product["id"],
+                        "name": product["name"],
+                        "price": product["price"],
+                        "quantity": quantity,
+                        "subtotal": subtotal,
+                    }
+                )
+        conn.close()
+
+    return items, grand_total
+
+
+@app.context_processor
+def inject_cart_count():
+    """Make the cart item count available to every template (for the navbar badge)."""
+    cart = session.get("cart", {})
+    return dict(cart_item_count=sum(cart.values()))
+
+
 # ---------------------------------------------------------------------------
-# Routes (only 4 pages, as required)
+# Routes
 # ---------------------------------------------------------------------------
 @app.route("/")
 def dashboard():
-    """Dashboard - summary cards plus a visible list of current products."""
+    """Dashboard - summary cards plus a preview of a few featured products.
+
+    With a full 20-item catalog, showing every product here would be
+    cluttered - the Dashboard shows a handful as a preview and links to
+    the Product List page, which is the real "browse everything" page.
+    """
     conn = get_db_connection()
-    products = conn.execute("SELECT * FROM products ORDER BY id").fetchall()
+    all_products = conn.execute("SELECT * FROM products ORDER BY id").fetchall()
     conn.close()
 
-    total_products = len(products)
-    total_stock = sum(p["stock"] for p in products)
-    total_value = sum(p["price"] * p["stock"] for p in products)
+    total_products = len(all_products)
+    total_stock = sum(p["stock"] for p in all_products)
+    total_value = sum(p["price"] * p["stock"] for p in all_products)
+    featured_products = all_products[:6]
 
     return render_template(
         "dashboard.html",
         total_products=total_products,
         total_stock=total_stock,
         total_value=total_value,
-        products=products,
+        products=featured_products,
     )
 
 
@@ -95,6 +163,77 @@ def products():
     all_products = conn.execute("SELECT * FROM products ORDER BY id").fetchall()
     conn.close()
     return render_template("products.html", products=all_products)
+
+
+@app.route("/product/<int:product_id>")
+def product_detail(product_id):
+    """Product Detail - click into a single product to see its full info."""
+    conn = get_db_connection()
+    product = conn.execute(
+        "SELECT * FROM products WHERE id = ?", (product_id,)
+    ).fetchone()
+    conn.close()
+
+    if product is None:
+        return redirect(url_for("products"))
+
+    return render_template("product_detail.html", product=product)
+
+
+@app.route("/cart/add/<int:product_id>", methods=["POST"])
+def add_to_cart(product_id):
+    """Add one unit of a product to the cart (stored in the session)."""
+    cart = session.get("cart", {})
+    key = str(product_id)
+    cart[key] = cart.get(key, 0) + 1
+    session["cart"] = cart
+
+    flash("Added to cart.", "success")
+    return redirect(request.referrer or url_for("products"))
+
+
+@app.route("/cart")
+def view_cart():
+    """Cart - everything the shopper has added so far, with a running total."""
+    items, grand_total = get_cart_items()
+    return render_template("cart.html", items=items, grand_total=grand_total)
+
+
+@app.route("/cart/remove/<int:product_id>", methods=["POST"])
+def remove_from_cart(product_id):
+    """Remove a product entirely from the cart."""
+    cart = session.get("cart", {})
+    cart.pop(str(product_id), None)
+    session["cart"] = cart
+
+    flash("Item removed from cart.", "info")
+    return redirect(url_for("view_cart"))
+
+
+@app.route("/checkout", methods=["GET", "POST"])
+def checkout():
+    """Checkout - review the order, then simulate a payment.
+
+    There's no real payment gateway here - "Pay & Place Order" simply
+    clears the cart and shows a confirmation page, which is enough to
+    demonstrate the full browse -> cart -> checkout flow.
+    """
+    items, grand_total = get_cart_items()
+
+    if request.method == "POST":
+        session["cart"] = {}
+        return redirect(url_for("order_confirmation"))
+
+    if not items:
+        return redirect(url_for("view_cart"))
+
+    return render_template("checkout.html", items=items, grand_total=grand_total)
+
+
+@app.route("/order-confirmation")
+def order_confirmation():
+    """Order Confirmation - shown after a (simulated) successful payment."""
+    return render_template("order_confirmation.html")
 
 
 @app.route("/add-product", methods=["GET", "POST"])

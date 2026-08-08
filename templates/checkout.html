@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Checkout - QuickStock{% endblock %}
+
+{% block content %}
+<h2 class="mb-4">Checkout</h2>
+
+<div class="card shadow-sm border-0 mb-4">
+    <div class="card-body p-0">
+        <table class="table align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Product</th>
+                    <th>Qty</th>
+                    <th>Subtotal</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in items %}
+                <tr>
+                    <td>{{ item.name }}</td>
+                    <td>{{ item.quantity }}</td>
+                    <td>&#8377;{{ "{:,.2f}".format(item.subtotal) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="d-flex justify-content-between align-items-center">
+    <h4 class="mb-0">Order Total: &#8377;{{ "{:,.2f}".format(grand_total) }}</h4>
+    <form method="POST" action="{{ url_for('checkout') }}" class="mb-0">
+        <button type="submit" class="btn btn-success btn-lg">Pay &amp; Place Order</button>
+    </form>
+</div>
+{% endblock %}

@@ -15,14 +15,24 @@
                     <th>Product</th>
                     <th>Price</th>
                     <th>Stock</th>
+                    <th></th>
                 </tr>
             </thead>
             <tbody>
                 {% for product in products %}
                 <tr>
-                    <td>{{ product.name }}</td>
+                    <td>
+                        <a href="{{ url_for('product_detail', product_id=product.id) }}" class="text-decoration-none fw-semibold">
+                            {{ product.name }}
+                        </a>
+                    </td>
                     <td>&#8377;{{ "{:,.2f}".format(product.price) }}</td>
                     <td>{{ product.stock }}</td>
+                    <td>
+                        <form method="POST" action="{{ url_for('add_to_cart', product_id=product.id) }}" class="mb-0">
+                            <button type="submit" class="btn btn-sm btn-primary">Add to Cart</button>
+                        </form>
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>

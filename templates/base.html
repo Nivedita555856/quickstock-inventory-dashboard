@@ -37,12 +37,31 @@
                         <a class="nav-link {% if request.path == url_for('about') %}active{% endif %}"
                            href="{{ url_for('about') }}">About</a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.path == url_for('view_cart') %}active{% endif %}"
+                           href="{{ url_for('view_cart') }}">
+                            Cart
+                            {% if cart_item_count %}
+                            <span class="badge bg-danger rounded-pill">{{ cart_item_count }}</span>
+                            {% endif %}
+                        </a>
+                    </li>
                 </ul>
             </div>
         </div>
     </nav>
 
     <main class="container my-4">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
         {% block content %}{% endblock %}
     </main>
 
