@@ -57,7 +57,7 @@ def init_db():
     row_count = conn.execute("SELECT COUNT(*) FROM products").fetchone()[0]
     if row_count == 0:
         starter_products = [
-            ("Dell Inspiron 15 Laptop", 55000.00, 20),
+            ("Dell Inspiron 15 Laptop_________", 55000.00, 20),
             ("HP Pavilion 14 Laptop", 48000.00, 15),
             ("Lenovo ThinkPad E14 Laptop", 62000.00, 10),
             ("Logitech M185 Wireless Mouse", 800.00, 50),
